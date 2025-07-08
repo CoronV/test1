@@ -1,0 +1,554 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>認知機能検査シミュレーション</title>
+    <style>
+        body {
+            font-family: 'Meiryo', 'Hiragino Kaku Gothic ProN', 'MS PGothic', sans-serif;
+            line-height: 1.8;
+            color: #333;
+            background-color: #f4f4f4;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+        }
+        #test-container {
+            background: white;
+            padding: 20px 40px;
+            border-radius: 10px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            width: 90%;
+            max-width: 800px;
+        }
+        h1, h2 {
+            text-align: center;
+            color: #005a9e;
+        }
+        p {
+            text-align: center;
+        }
+        button {
+            display: block;
+            margin: 20px auto;
+            padding: 12px 25px;
+            font-size: 18px;
+            font-weight: bold;
+            color: white;
+            background-color: #007bff;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        button:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+        }
+        .hidden {
+            display: none;
+        }
+        .image-selection-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 15px;
+        }
+        .image-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        .image-grid img {
+            width: 100%;
+            height: auto;
+            border: 1px solid #eee;
+            border-radius: 4px;
+        }
+        .recall-grid, .recall-grid-hinted {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 15px;
+        }
+        .recall-item {
+            text-align: center;
+        }
+        .recall-item input {
+            width: 90%;
+            padding: 8px;
+            font-size: 16px;
+            text-align: center;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+        .recall-item .hint {
+            font-size: 14px;
+            color: #666;
+            margin-top: 5px;
+        }
+        #interference-task {
+            text-align: center;
+        }
+        #number-grid {
+            display: grid;
+            grid-template-columns: repeat(10, 1fr);
+            gap: 5px;
+            margin: 20px auto;
+            padding: 10px;
+            border: 1px solid #ccc;
+            max-width: 400px;
+        }
+        #number-grid span {
+            padding: 5px;
+            font-size: 18px;
+            font-weight: bold;
+        }
+        #result-display {
+            text-align: left;
+            padding: 20px;
+            border: 1px solid #ddd;
+            background-color: #f9f9f9;
+            border-radius: 5px;
+        }
+        #result-display h2 {
+            text-align: center;
+        }
+        .result-section {
+            margin-bottom: 15px;
+        }
+        .result-section h3 {
+            border-bottom: 2px solid #007bff;
+            padding-bottom: 5px;
+            color: #005a9e;
+        }
+        .correct { color: green; font-weight: bold; }
+        .incorrect { color: red; }
+    </style>
+</head>
+<body>
+
+<div id="test-container">
+    <!-- Section 0: Image Set Selection -->
+    <div id="selection-section">
+        <h1>認知機能検査シミュレーション</h1>
+        <p>使用するイラストのセットを選択してください。</p>
+        <div class="image-selection-container">
+            <button onclick="initializeTest(1)">スライド 1-16</button>
+            <button onclick="initializeTest(17)">スライド 17-32</button>
+            <button onclick="initializeTest(33)">スライド 33-48</button>
+            <button onclick="initializeTest(49)">スライド 49-64</button>
+        </div>
+    </div>
+
+    <!-- Section 1: Introduction -->
+    <div id="intro-section" class="hidden">
+        <h1>記憶力検査</h1>
+        <p>これから、記憶力についての検査を行います。</p>
+        <p>4枚のイラストを順番に見て覚えていただきます。これを4回繰り返します。</p>
+        <p>準備ができたら下のボタンを押してください。</p>
+        <button onclick="startMemorization()">検査をはじめる</button>
+    </div>
+
+    <!-- Section 2: Memorization -->
+    <div id="memorization-section" class="hidden">
+        <h2 id="memorization-title">イラストを覚えてください (1/4)</h2>
+        <div class="image-grid" id="image-display-grid">
+            <!-- Images will be inserted here -->
+        </div>
+        <button id="next-memorization-btn" onclick="nextMemorizationStep()">次へ</button>
+    </div>
+
+    <!-- Section 3: Interference Task -->
+    <div id="interference-section" class="hidden">
+        <h2>課題：数字を探す</h2>
+        <p>先ほどのイラストとは関係のない課題です。</p>
+        <p id="interference-instruction"></p>
+        <div id="number-grid"></div>
+        <p>終わったら、下のボタンを押して、記憶したイラストを回答する検査に進みます。</p>
+        <button onclick="startRecall1()">回答へ進む</button>
+    </div>
+
+    <!-- Section 4: Recall 1 (No hints) -->
+    <div id="recall1-section" class="hidden">
+        <h2>回答１：イラストの再生</h2>
+        <p>先ほど覚えた16個のイラストの名前を、思い出せるだけすべて書いてください。</p>
+        <p>（ひらがな、カタカナどちらでも構いません）</p>
+        <div class="recall-grid" id="recall-grid-1"></div>
+        <button onclick="startRecall2()">回答を終える</button>
+    </div>
+
+    <!-- Section 5: Recall 2 (With hints) -->
+    <div id="recall2-section" class="hidden">
+        <h2>回答２：ヒントを元にした再生</h2>
+        <p>今度は、ヒントを参考に、もう一度イラストの名前を思い出して書いてください。</p>
+        <p>（先ほど書いたものも、もう一度書いて構いません）</p>
+        <div class="recall-grid-hinted" id="recall-grid-2"></div>
+        <button onclick="startOrientation()">回答を終える</button>
+    </div>
+
+    <!-- Section 6: Time Orientation -->
+    <div id="orientation-section" class="hidden">
+        <h2>時間の見当識</h2>
+        <p>今日の年月日、曜日、そして今の時間を答えてください。</p>
+        <div id="orientation-form">
+            <p>年：<input type="number" id="year-input"> 年</p>
+            <p>月：<input type="number" id="month-input"> 月</p>
+            <p>日：<input type="number" id="day-input"> 日</p>
+            <p>曜日：<input type="text" id="weekday-input"> 曜日</p>
+            <p>時間：<input type="number" id="hour-input"> 時 <input type="number" id="minute-input"> 分</p>
+        </div>
+        <button onclick="showResults()">採点する</button>
+    </div>
+
+    <!-- Section 7: Results -->
+    <div id="result-section" class="hidden">
+        <div id="result-display"></div>
+        <button onclick="location.reload()">もう一度試す</button>
+    </div>
+</div>
+
+<script>
+    // !!! 重要 !!!
+    // ここにスライド1～64の正しい「名前」と「ヒント」を記入してください。
+    // 現在は仮のデータが入っています。
+    const allIllustrations = [
+        // パターンA (スライド 1-16)
+        { id: 1, name_kana: 'タイホウ', name_hira: 'たいほう', hint: '武器', image: 'スライド1.JPG' },
+        { id: 2, name_kana: 'オルガン', name_hira: 'おるがん', hint: '楽器', image: 'スライド2.JPG' },
+        { id: 3, name_kana: 'ミミ', name_hira: 'みみ', hint: '体の一部', image: 'スライド3.JPG' },
+        { id: 4, name_kana: 'ラジオ', name_hira: 'らじお', hint: '電気製品', image: 'スライド4.JPG' },
+        { id: 5, name_kana: 'テントウムシ', name_hira: 'てんとうむし', hint: '昆虫', image: 'スライド5.JPG' },
+        { id: 6, name_kana: 'ライオン', name_hira: 'らいおん', hint: '動物', image: 'スライド6.JPG' },
+        { id: 7, name_kana: 'タケノコ', name_hira: 'たけのこ', hint: '野菜', image: 'スライド7.JPG' },
+        { id: 8, name_kana: 'フライパン', name_hira: 'ふらいぱん', hint: '台所用品', image: 'スライド8.JPG' },
+        { id: 9, name_kana: 'モノサシ', name_hira: 'ものさし', hint: '文房具', image: 'スライド9.JPG' },
+        { id: 10, name_kana: 'オートバイ', name_hira: 'おーとばい', hint: '乗り物', image: 'スライド10.JPG' },
+        { id: 11, name_kana: 'ブドウ', name_hira: 'ぶどう', hint: '果物', image: 'スライド11.JPG' },
+        { id: 12, name_kana: 'スカート', name_hira: 'すかーと', hint: '衣類', image: 'スライド12.JPG' },
+        { id: 13, name_kana: 'ニワトリ', name_hira: 'にわとり', hint: '動物', image: 'スライド13.JPG' },
+        { id: 14, name_kana: 'バラ', name_hira: 'ばら', hint: '花', image: 'スライド14.JPG' },
+        { id: 15, name_kana: 'ペンチ', name_hira: 'ぺんち', hint: '道具', image: 'スライド15.JPG' },
+        { id: 16, name_kana: 'ベッド', name_hira: 'べっど', hint: '家具', image: 'スライド16.JPG' },
+
+        // パターンB (スライド 17-32)
+        { id: 17, name_kana: 'センシャ', name_hira: 'せんしゃ', hint: '武器', image: 'スライド17.JPG' },
+        { id: 18, name_kana: 'タイコ', name_hira: 'たいこ', hint: '楽器', image: 'スライド18.JPG' },
+        { id: 19, name_kana: 'メ', name_hira: 'め', hint: '体の一部', image: 'スライド19.JPG' },
+        { id: 20, name_kana: 'ステレオ', name_hira: 'すてれお', hint: '電気製品', image: 'スライド20.JPG' },
+        { id: 21, name_kana: 'トンボ', name_hira: 'とんぼ', hint: '昆虫', image: 'スライド21.JPG' },
+        { id: 22, name_kana: 'ウサギ', name_hira: 'うさぎ', hint: '動物', image: 'スライド22.JPG' },
+        { id: 23, name_kana: 'トマト', name_hira: 'とまと', hint: '野菜', image: 'スライド23.JPG' },
+        { id: 24, name_kana: 'ヤカン', name_hira: 'やかん', hint: '台所用品', image: 'スライド24.JPG' },
+        { id: 25, name_kana: 'マンネンヒツ', name_hira: 'まんねんひつ', hint: '文房具', image: 'スライド25.JPG' },
+        { id: 26, name_kana: 'ヒコウキ', name_hira: 'ひこうき', hint: '乗り物', image: 'スライド26.JPG' },
+        { id: 27, name_kana: 'レモン', name_hira: 'れもん', hint: '果物', image: 'スライド27.JPG' },
+        { id: 28, name_kana: 'コート', name_hira: 'こーと', hint: '衣類', image: 'スライド28.JPG' },
+        { id: 29, name_kana: 'ペンギン', name_hira: 'ぺんぎん', hint: '動物', image: 'スライド29.JPG' },
+        { id: 30, name_kana: 'チューリップ', name_hira: 'ちゅーりっぷ', hint: '花', image: 'スライド30.JPG' },
+        { id: 31, name_kana: 'ドライバー', name_hira: 'どらいばー', hint: '道具', image: 'スライド31.JPG' },
+        { id: 32, name_kana: 'イス', name_hira: 'いす', hint: '家具', image: 'スライド32.JPG' },
+
+        // パターンC (スライド 33-48)
+        { id: 33, name_kana: 'キカンジュウ', name_hira: 'きかんじゅう', hint: '武器', image: 'スライド33.JPG' },
+        { id: 34, name_kana: 'アコーディオン', name_hira: 'あこーでぃおん', hint: '楽器', image: 'スライド34.JPG' },
+        { id: 35, name_kana: 'アシ', name_hira: 'あし', hint: '体の一部', image: 'スライド35.JPG' },
+        { id: 36, name_kana: 'テレビ', name_hira: 'てれび', hint: '電気製品', image: 'スライド36.JPG' },
+        { id: 37, name_kana: 'セミ', name_hira: 'せみ', hint: '昆虫', image: 'スライド37.JPG' },
+        { id: 38, name_kana: 'ニワトリ', name_hira: 'にわとり', hint: '動物', image: 'スライド38.JPG' },
+        { id: 39, name_kana: 'トウモロコシ', name_hira: 'とうもろこし', hint: '野菜', image: 'スライド39.JPG' },
+        { id: 40, name_kana: 'ナベ', name_hira: 'なべ', hint: '台所用品', image: 'スライド40.JPG' },
+        { id: 41, name_kana: 'フデ', name_hira: 'ふで', hint: '文房具', image: 'スライド41.JPG' },
+        { id: 42, name_kana: 'ヘリコプター', name_hira: 'へりこぷたー', hint: '乗り物', image: 'スライド42.JPG' },
+        { id: 43, name_kana: 'メロン', name_hira: 'めろん', hint: '果物', image: 'スライド43.JPG' },
+        { id: 44, name_kana: 'ドレス', name_hira: 'どれす', hint: '衣類', image: 'スライド44.JPG' },
+        { id: 45, name_kana: 'クジャク', name_hira: 'くじゃく', hint: '動物', image: 'スライド45.JPG' },
+        { id: 46, name_kana: 'ユリ', name_hira: 'ゆり', hint: '花', image: 'スライド46.JPG' },
+        { id: 47, name_kana: 'トンカチ', name_hira: 'とんかち', hint: '道具', image: 'スライド47.JPG' },
+        { id: 48, name_kana: 'ツクエ', name_hira: 'つくえ', hint: '家具', image: 'スライド48.JPG' },
+
+        // パターンD (スライド 49-64)
+        { id: 49, name_kana: 'カタナ', name_hira: 'かたな', hint: '武器', image: 'スライド49.JPG' },
+        { id: 50, name_kana: 'コト', name_hira: 'こと', hint: '楽器', image: 'スライド50.JPG' },
+        { id: 51, name_kana: 'テ', name_hira: 'て', hint: '体の一部', image: 'スライド51.JPG' },
+        { id: 52, name_kana: 'デンワ', name_hira: 'でんわ', hint: '電気製品', image: 'スライド52.JPG' },
+        { id: 53, name_kana: 'カブトムシ', name_hira: 'かぶとむし', hint: '昆虫', image: 'スライド53.JPG' },
+        { id: 54, name_kana: 'ウマ', name_hira: 'うま', hint: '動物', image: 'スライド54.JPG' },
+        { id: 55, name_kana: 'カボチャ', name_hira: 'かぼちゃ', hint: '野菜', image: 'スライド55.JPG' },
+        { id: 56, name_kana: 'ホウチョウ', name_hira: 'ほうちょう', hint: '台所用品', image: 'スライド56.JPG' },
+        { id: 57, name_kana: 'ペン', name_hira: 'ぺん', hint: '文房具', image: 'スライド57.JPG' },
+        { id: 58, name_kana: 'フネ', name_hira: 'ふね', hint: '乗り物', image: 'スライド58.JPG' },
+        { id: 59, name_kana: 'パイナップル', name_hira: 'ぱいなっぷる', hint: '果物', image: 'スライド59.JPG' },
+        { id: 60, name_kana: 'ズボン', name_hira: 'ずぼん', hint: '衣類', image: 'スライド60.JPG' },
+        { id: 61, name_kana: 'スズメ', name_hira: 'すずめ', hint: '動物', image: 'スライド61.JPG' },
+        { id: 62, name_kana: 'ヒマワリ', name_hira: 'ひまわり', hint: '花', image: 'スライド62.JPG' },
+        { id: 63, name_kana: 'ノコギリ', name_hira: 'のこぎり', hint: '道具', image: 'スライド63.JPG' },
+        { id: 64, name_kana: 'ソファー', name_hira: 'そふぁー', hint: '家具', image: 'スライド64.JPG' }
+    ];
+
+    let illustrations = [];
+    let userAnswers1 = Array(16).fill('');
+    let userAnswers2 = Array(16).fill('');
+    let memorizationStep = 0;
+
+    function showSection(sectionId) {
+        document.querySelectorAll('#test-container > div').forEach(section => {
+            section.classList.add('hidden');
+        });
+        document.getElementById(sectionId).classList.remove('hidden');
+    }
+
+    function initializeTest(startId) {
+        illustrations = allIllustrations.slice(startId - 1, startId - 1 + 16);
+        showSection('intro-section');
+    }
+
+    function startMemorization() {
+        memorizationStep = 0;
+        showMemorizationStep();
+        showSection('memorization-section');
+    }
+
+    function showMemorizationStep() {
+        const grid = document.getElementById('image-display-grid');
+        grid.innerHTML = '';
+        const startIndex = memorizationStep * 4;
+        const endIndex = startIndex + 4;
+        const currentIllustrations = illustrations.slice(startIndex, endIndex);
+
+        currentIllustrations.forEach(item => {
+            const img = document.createElement('img');
+            img.src = item.image;
+            img.alt = item.name_kana;
+            grid.appendChild(img);
+        });
+
+        document.getElementById('memorization-title').textContent = `イラストを覚えてください (${memorizationStep + 1}/4)`;
+        
+        if (memorizationStep >= 3) {
+            document.getElementById('next-memorization-btn').textContent = '覚えました';
+        } else {
+            document.getElementById('next-memorization-btn').textContent = '次へ';
+        }
+    }
+
+    function nextMemorizationStep() {
+        memorizationStep++;
+        if (memorizationStep < 4) {
+            showMemorizationStep();
+        } else {
+            startInterferenceTask();
+        }
+    }
+
+    function startInterferenceTask() {
+        const num1 = Math.floor(Math.random() * 9) + 1;
+        let num2 = Math.floor(Math.random() * 9) + 1;
+        while (num1 === num2) {
+            num2 = Math.floor(Math.random() * 9) + 1;
+        }
+        
+        document.getElementById('interference-instruction').textContent = 
+            `表の中から数字の「${num1}」と「${num2}」に斜線（/）を引くつもりで探してください。`;
+
+        const grid = document.getElementById('number-grid');
+        grid.innerHTML = '';
+        for (let i = 0; i < 100; i++) {
+            const span = document.createElement('span');
+            span.textContent = Math.floor(Math.random() * 10);
+            grid.appendChild(span);
+        }
+        showSection('interference-section');
+    }
+
+    function setupRecallGrid(gridId, withHints) {
+        const grid = document.getElementById(gridId);
+        grid.innerHTML = '';
+        for (let i = 0; i < 16; i++) {
+            const itemDiv = document.createElement('div');
+            itemDiv.className = 'recall-item';
+            
+            const input = document.createElement('input');
+            input.type = 'text';
+            
+            if (withHints) {
+                input.oninput = (e) => userAnswers2[i] = e.target.value;
+                const hint = document.createElement('div');
+                hint.className = 'hint';
+                hint.textContent = `ヒント：${illustrations[i].hint}`;
+                itemDiv.appendChild(input);
+                itemDiv.appendChild(hint);
+            } else {
+                input.oninput = (e) => userAnswers1[i] = e.target.value;
+                itemDiv.appendChild(document.createTextNode(`${i + 1}. `));
+                itemDiv.appendChild(input);
+            }
+            grid.appendChild(itemDiv);
+        }
+    }
+
+    function startRecall1() {
+        setupRecallGrid('recall-grid-1', false);
+        showSection('recall1-section');
+    }
+
+    function startRecall2() {
+        setupRecallGrid('recall-grid-2', true);
+        showSection('recall2-section');
+    }
+
+    function startOrientation() {
+        showSection('orientation-section');
+    }
+
+    function normalize(str) {
+        if (typeof str !== 'string') return '';
+        return str.trim().replace(/[ァ-ヶ]/g, function(match) {
+            return String.fromCharCode(match.charCodeAt(0) - 0x60);
+        });
+    }
+
+    function showResults() {
+        let memoryScore = 0;
+        let orientationScore = 0;
+
+        // 正解のイラスト名をひらがなとカタカナでリスト化
+        const correctAnswers = illustrations.map(item => ({
+            hira: item.name_hira,
+            kana: normalize(item.name_kana),
+            original: item
+        }));
+
+        // --- 回答1（ヒントなし）の採点 ---
+        const recall1Answers = userAnswers1.map(normalize).filter(ans => ans); // 空の回答は除く
+        const foundInRecall1 = new Array(16).fill(false);
+        
+        recall1Answers.forEach(answer => {
+            // まだ正解になっていないイラストの中から探す
+            const matchIndex = correctAnswers.findIndex((corr, index) => 
+                !foundInRecall1[index] && (corr.hira === answer || corr.kana === answer)
+            );
+
+            if (matchIndex !== -1) {
+                memoryScore += 5;
+                foundInRecall1[matchIndex] = true; // 正解済みとしてマーク
+            }
+        });
+
+        // --- 回答2（ヒントあり）の採点 ---
+        const recall2Answers = userAnswers2.map(normalize).filter(ans => ans);
+        const foundInRecall2 = new Array(16).fill(false);
+
+        recall2Answers.forEach(answer => {
+            const matchIndex = correctAnswers.findIndex((corr, index) => 
+                !foundInRecall1[index] && !foundInRecall2[index] && // ヒントなしで正解したものは除く
+                (corr.hira === answer || corr.kana === answer)
+            );
+
+            if (matchIndex !== -1) {
+                memoryScore += 2.5;
+                foundInRecall2[matchIndex] = true;
+            }
+        });
+
+        // --- 結果表示の生成 ---
+        const results1Html = [];
+        const results2Html = [];
+        
+        for (let i = 0; i < 16; i++) {
+            const item = illustrations[i];
+            if (foundInRecall1[i]) {
+                results1Html.push(`<li>${item.name_kana}: <span class="correct">正解 (5点)</span></li>`);
+                results2Html.push(`<li>${item.name_kana}: <span>(ヒントなしで正解済み)</span></li>`);
+            } else if (foundInRecall2[i]) {
+                results1Html.push(`<li>${item.name_kana}: <span class="incorrect">不正解</span></li>`);
+                results2Html.push(`<li>${item.name_kana}: <span class="correct">正解 (ヒントあり: 2.5点)</span></li>`);
+            } else {
+                results1Html.push(`<li>${item.name_kana}: <span class="incorrect">不正解</span></li>`);
+                results2Html.push(`<li>${item.name_kana}: <span class="incorrect">不正解</span></li>`);
+            }
+        }
+
+        // --- 時間の見当識の採点 ---
+        const now = new Date();
+        const year = now.getFullYear();
+        const month = now.getMonth() + 1;
+        const day = now.getDate();
+        const weekdays = ["日", "月", "火", "水", "木", "金", "土"];
+        const weekday = weekdays[now.getDay()];
+        const hour = now.getHours();
+        const minute = now.getMinutes();
+
+        let orientationHtml = '<ul>';
+        if (parseInt(document.getElementById('year-input').value) === year) {
+            orientationScore += 5;
+            orientationHtml += '<li>年: <span class="correct">正解 (5点)</span></li>';
+        } else {
+            orientationHtml += `<li>年: <span class="incorrect">不正解 (正解: ${year})</span></li>`;
+        }
+        if (parseInt(document.getElementById('month-input').value) === month) {
+            orientationScore += 5;
+            orientationHtml += '<li>月: <span class="correct">正解 (5点)</span></li>';
+        } else {
+            orientationHtml += `<li>月: <span class="incorrect">不正解 (正解: ${month})</span></li>`;
+        }
+        if (parseInt(document.getElementById('day-input').value) === day) {
+            orientationScore += 5;
+            orientationHtml += '<li>日: <span class="correct">正解 (5点)</span></li>';
+        } else {
+            orientationHtml += `<li>日: <span class="incorrect">不正解 (正解: ${day})</span></li>`;
+        }
+        const weekdayInput = document.getElementById('weekday-input').value.trim();
+        if (weekdayInput.startsWith(weekday)) {
+             orientationScore += 5;
+             orientationHtml += '<li>曜日: <span class="correct">正解 (5点)</span></li>';
+        } else {
+             orientationHtml += `<li>曜日: <span class="incorrect">不正解 (正解: ${weekday})</span></li>`;
+        }
+        const hourInput = parseInt(document.getElementById('hour-input').value);
+        const minuteInput = parseInt(document.getElementById('minute-input').value);
+        const inputTime = hourInput * 60 + minuteInput;
+        const correctTime = hour * 60 + minute;
+        if (Math.abs(inputTime - correctTime) <= 10) { // Allow 10 min difference
+            orientationScore += 5;
+            orientationHtml += '<li>時間: <span class="correct">正解 (5点)</span></li>';
+        } else {
+            orientationHtml += `<li>時間: <span class="incorrect">不正解 (正解: ${hour}時${minute}分頃)</span></li>`;
+        }
+        orientationHtml += '</ul>';
+
+        const totalScore = memoryScore + orientationScore;
+
+        const resultDisplay = document.getElementById('result-display');
+        resultDisplay.innerHTML = `
+            <h2>採点結果</h2>
+            <div class="result-section">
+                <h3>総合得点: ${totalScore}点 / 100点</h3>
+            </div>
+            <div class="result-section">
+                <h3>記憶力検査 (${memoryScore}点 / 80点)</h3>
+                <h4>回答1（ヒントなし）の結果</h4>
+                <ol>${results1Html.join('')}</ol>
+                <h4>回答2（ヒントあり）の結果</h4>
+                <ol>${results2Html.join('')}</ol>
+            </div>
+            <div class="result-section">
+                <h3>時間の見当識 (${orientationScore}点 / 20点)</h3>
+                ${orientationHtml}
+            </div>
+        `;
+        showSection('result-section');
+    }
+
+    // Initialize
+    showSection('selection-section');
+</script>
+
+</body>
+</html>
